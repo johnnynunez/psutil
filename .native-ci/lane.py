@@ -51,9 +51,13 @@ run([test,'-m','pip','freeze'])
 run([test,harness/'functional.py',name,version,out/'functional.json'])
 if name=='psutil':
     methods=['test_pid','test_kill','test_terminate','test_send_signal','test_wait_exited','test_wait_timeout','test_wait_timeout_nonblocking','test_cpu_percent','test_cpu_times','test_create_time','test_num_threads','test_num_handles','test_threads','test_memory_info','test_memory_full_info','test_memory_percent','test_is_running','test_exe','test_cmdline','test_name','test_status','test_username','test_cwd','test_ppid','test_parent','test_invalid_pid','test_oneshot','test_oneshot_twice']
-    tests=root/'psutil_tests';shutil.copytree(source/'psutil/tests',tests,dirs_exist_ok=True)
-    # Upstream tests use psutil.tests utilities, shipped in both selected distributions.
-    targets=[f'{tests}/test_process.py::TestProcess::{m}' for m in methods]
+    tests=root/'psutil_tests'
+    source_tests=source/'psutil/tests' if version=='5.9.8' else source/'tests'
+    shutil.copytree(source_tests,tests,dirs_exist_ok=True)
+    # 5.9.8 ships psutil.tests; 7.2.2 uses relative imports from standalone tests.
+    def test_class(method):
+        return 'TestProcessWait' if version=='7.2.2' and method.startswith('test_wait_') else 'TestProcess'
+    targets=[f'{tests}/test_process.py::{test_class(m)}::{m}' for m in methods]
     p=run([test,'-m','pytest',*targets,'-v','-ra','--timeout=30',f'--junitxml={out}/upstream.xml'],check=False)
     (out/'test-scope.json').write_text(json.dumps({'selected':targets,'excluded':'all other upstream modules and Process methods; bounded no-admin self/owned-child audit, not full psutil suite'},indent=2))
 else:
