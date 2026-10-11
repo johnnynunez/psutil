@@ -1,0 +1,50 @@
+name: Native exact-pin CPU wheels
+on:
+  push:
+    branches: [ci/native-exact-pins-20261012]
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: windows-11-arm
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: '5.9.8'
+            sha: '27a1432daeacd46b287517c11bfea2af4fd95a88'
+            mode: build
+          - version: '7.2.2'
+            sha: '9eea97dd6f1d16ea33f5144c8925f1ce7a0688e1'
+            mode: published
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: giampaolo/psutil
+          ref: ${{ matrix.sha }}
+          path: source
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          architecture: arm64
+      - name: Build and exercise installed wheel
+        shell: pwsh
+        env:
+          PYTHONUTF8: '1'
+          PYTHONNOUSERSITE: '1'
+        run: python harness/.native-ci/lane.py psutil '${{ matrix.version }}' '${{ matrix.sha }}' '${{ matrix.mode }}'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: psutil-${{ matrix.version }}-cp312-win-arm64
+          path: ${{ github.workspace }}/native/artifacts
+          if-no-files-found: error
+          retention-days: 14
